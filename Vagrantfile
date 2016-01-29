@@ -23,11 +23,17 @@ Vagrant.configure(2) do |config|
   config.vm.define "server" do |server|
     server.vm.network "private_network", ip: "192.168.33.10"
     server.vm.hostname = "server.ipademo.local"
+    server.vm.provider :libvirt do |domain|
+      domain.memory = 1024
+    end
   end
 
   config.vm.define "replica" do |replica|
     replica.vm.network "private_network", ip: "192.168.33.11"
     replica.vm.hostname = "replica.ipademo.local"
+    replica.vm.provider :libvirt do |domain|
+      domain.memory = 1024
+    end
 
     config.vm.provision "shell",
       inline: 'echo "nameserver 192.168.33.10" > /etc/resolv.conf'
