@@ -29,7 +29,7 @@ Curriculum overview
 - `Module 5: Web application authentication and authorisation`_
 - `Module 6: Certificate management`_
 - `Module 7: Replica installation`_
-
+- `Module 8: Managing public ssh-keys for users and hosts`-
 
 Editing files on VMs
 --------------------
@@ -1196,3 +1196,101 @@ replication of data to the new Directory Server instance::
   Update succeeded
 
 After ``ipa-replica-install`` finishes, the replica is operational.
+
+
+Module 8: Managing public ssh-keys for users and hosts 
+======================================================
+
+In this module you explore, how to use FreeIPA as a backend provider 
+for ssh-keys. Instead of using distributed ``authorized_keys`` and 
+``known_hosts`` files, ssh-keys are uploaded to their corresponding 
+user and host entries in FreeIPA.
+
+Using FreeIPA as a backend store for ssh user-keys
+--------------------------------------------------
+
+OpenSSH uses ``public-private key pairs`` to authenticate users. 
+A user attempts to access some network resource and presents its key 
+pair. The machine then stores the user's public key in an 
+``authorized_keys`` file. Any time that the user attempts to access 
+the resource again, the machine simply checks its ``authorized_keys`` 
+file and then grants access automatically to approved users. If the 
+target system does not share a common home directory, the user must 
+copy the public part of his SSH key to the target system he intends 
+to log in to. The public portion of the SSH key must be copied to 
+each target system the user intends to log in to.
+
+In FreeIPA, the System Security Services Daemon (SSSD) can be
+configured to cache and retrieve user SSH keys so that applications
+and services only have to look in one location for user keys.
+Because SSSD can use FreeIPA  as one of its identity information 
+providers, FreeIPA provides a universal and centralized repository 
+of keys. Administrators do not need to worry about distributing, 
+updating, or verifying user SSH keys.
+
+Generate a user key on the client system::
+
+  [client]$ sudo su - alice
+  [alice@client]$
+  [alice@client]$ ssh-keygen -C alice@ipademo.local
+  Generating public/private rsa key pair.
+  Enter file in which to save the key (/home/alice/.ssh/id_rsa): 
+  Created directory '/home/alice/.ssh'.
+  Enter passphrase (empty for no passphrase): 
+  Enter same passphrase again: 
+  Your identification has been saved in /home/alice/.ssh/id_rsa.
+  Your public key has been saved in /home/alice/.ssh/id_rsa.pub.
+  The key fingerprint is:
+  SHA256:rgVSyPM/yn/b5bsZQIsAXWF+16zkP59VS9GS+k+bbOg alice@ipademo.local
+
+Copy the base64-encoded public key and upload it to Alice
+user entry in the FreeIPA system::
+
+  [alice@client]$ kinit alice
+  Password for alice@IPADEMO.LOCAL:
+  
+  [alice@client]$ cat /home/alice/.ssh/id_rsa.pub
+  ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAA[...]alice@ipademo.local
+  
+  [alice@client]$ ipa user-mod alice --sshpubkey="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAA[...]alice@ipademo.local"
+
+During the configuration of the systems, the Security
+Services Daemon (SSSD) has already been configured to use 
+FreeIPA as one of its identity domains and OpenSSH has been 
+setup to use SSSD for managing user keys. 
+
+If you have disabled the ``allow_all`` HBAC rule, add a new rule
+that will **allow ``alice`` to access the ``sshd`` service on any
+host**.
+
+Logging in to the server using the previously created ``ssh pubkey`` 
+should now work out of the box::
+
+  [alice@client]$ ssh -o GSSAPIAuthentication=no server.ipademo.local
+  Last login: Tue Feb  2 15:10:13 2016
+  [alice@server]$ 
+
+To verify the ssh pubkey has been used for authentication, you can 
+check the sshd service journal on the server, which should have a 
+similar entry like this one::
+
+  server.ipademo.local sshd[19729]: Accepted publickey for alice from 192.168.33.20 port 37244 \
+    ssh2: RSA SHA256:rgVSyPM/yn/b5bsZQIsAXWF+16zkP59VS9GS+k+bbOg
+
+
+Using FreeIPA as a backend store for ssh host-keys
+--------------------------------------------------
+
+OpenSSH uses public keys to authenticate hosts. One machine attempts to
+access another machine and presents its key pair. The first time the host
+authenticates, the administrator on the target machine has to approve the
+request manually. The machine then stores the host's public key in a
+``known_hosts`` file. Any time that the remote machine attempts to access the
+target machine again, the target machine simply checks its ``known_hosts`` 
+file and then grants access automatically to approved hosts.
+
+Based on the last exercise, try to figure out how you can upload ssh
+host-keys to the FreeIPA server. **Note: OpenSSH has already been
+configured to lookup keys on the FreeIPA server, so no manual configuration
+is required for this service.**
+
