@@ -34,7 +34,7 @@ Vagrant.configure(2) do |config|
     replica.vm.hostname = "replica.ipademo.local"
 
     replica.vm.provision "shell",
-      inline: 'sudo echo "nameserver 192.168.33.10" > /etc/resolv.conf'
+      inline: 'echo "nameserver 192.168.33.10" > /etc/resolv.conf'
   end
 
   config.vm.define "client" do |client|
@@ -44,7 +44,7 @@ Vagrant.configure(2) do |config|
     client.vm.provision "shell",
       inline: 'echo "nameserver 192.168.33.10" > /etc/resolv.conf'
     client.vm.provision "shell",
-      inline: 'sudo sed -i -n "/^<VirtualHost/q;p" /etc/httpd/conf.d/nss.conf'
+      inline: 'sed -i -n "/^<VirtualHost/q;p" /etc/httpd/conf.d/nss.conf'
     client.vm.provision "shell",
       inline: 'systemctl -q enable httpd && systemctl start httpd'
   end
