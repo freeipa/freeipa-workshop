@@ -1,5 +1,33 @@
 #!/bin/bash
-sudo dnf install -y freeipa-server freeipa-server-dns sssd-dbus mod_lookup_identity mod_authnz_pam haveged nmap-ncat nano pamtester bash-completion
+
+fedora_packages=(
+freeipa-server
+freeipa-server-dns
+)
+
+el_packages=(
+ipa-server
+ipa-server-dns
+)
+
+# ensure epel is enabled for el-7 builds
+common_packages=(
+bash-completion
+haveged
+mod_authnz_pam
+mod_lookup_identity
+nano
+nmap-ncat
+pamtester
+sssd-dbus
+)
+
+dist=$(python -c 'import platform; print(platform.linux_distribution()[0])')
+
+[ "$dist" = "Fedora" ] \
+  && sudo dnf install -y ${fedora_packages[@]} ${common_packages[@]} \
+  || sudo yum install -y ${el_packages[@]} ${common_packages[@]}
+
 sudo systemctl enable haveged
 sudo sh -c "echo 'PS1=\"[\u@\h]\\\\$ \"' >> /etc/profile"
 sudo sh -c "echo 'PS1=\"[\h]\\\\$ \"' >> /etc/bashrc"

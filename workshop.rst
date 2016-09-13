@@ -111,8 +111,8 @@ Also ensure you have the latest versions of ``selinux-policy`` and
 
 Allow your regular user ID to start and stop Vagrant boxes. A PolicyKit rule
 will be added that allows users in the ``vagrant`` group to control VMs through
-libvirt. The necessary rule is included in the ``vagrant-libvirt-doc`` 
-package. Run the following commands to add your local user to the vagrant 
+libvirt. The necessary rule is included in the ``vagrant-libvirt-doc``
+package. Run the following commands to add your local user to the vagrant
 group and to copy the necessary rule to the right place::
 
   $ usermod -a -G vagrant $USER
@@ -169,6 +169,21 @@ https://www.virtualbox.org/wiki/Download_Old_Builds_4_3.
 
 Install Git from https://git-scm.com/download/mac or via your
 preferred package manager.
+
+
+Red Hat Enterprise Linux / CentOS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Enable the vagrant Software Collections
+https://www.softwarecollections.org/en/scls/rhscl/sclo-vagrant1
+
+Install Vagrant and Git::
+
+  $ sudo yum install sclo-vagrant1 git
+
+Start using the software collection::
+
+  $ scl enable solo-vagrant1 bash
 
 
 Debian / Ubuntu
@@ -294,12 +309,12 @@ On ``server``, start the FreeIPA server installation program::
 
 The ``--no-host-dns`` argument is needed because there are no reverse
 DNS records for the Vagrant environment.  For production deployment,
-this important sanity check should not be skipped. The ``--mkhomedir`` 
-flag configure PAM to create missing home directories when users log 
-into the host for the first time. FreeIPA supports automount so 
+this important sanity check should not be skipped. The ``--mkhomedir``
+flag configure PAM to create missing home directories when users log
+into the host for the first time. FreeIPA supports automount so
 consider using that for production deployments.
 
-You will be asked a series of questions. Accept the defaults for most 
+You will be asked a series of questions. Accept the defaults for most
 of the questions, except as outlined below.
 
 Configure FreeIPA's DNS server::
@@ -315,17 +330,17 @@ Accept default values for the server hostname, domain name and realm::
   Example: master.example.com.
 
 
-  Server host name [server.ipademo.local]: 
+  Server host name [server.ipademo.local]:
 
   Warning: skipping DNS resolution of host server.ipademo.local
   The domain name has been determined based on the host name.
 
-  Please confirm the domain name [ipademo.local]: 
+  Please confirm the domain name [ipademo.local]:
 
   The kerberos protocol requires a Realm name to be defined.
   This is typically the domain name converted to uppercase.
 
-  Please provide a realm name [IPADEMO.LOCAL]: 
+  Please provide a realm name [IPADEMO.LOCAL]:
 
 
 Enter passwords for *Directory Manager* (used to manage the
@@ -341,14 +356,14 @@ forget during the workshop!
   instance of directory server created for IPA.
   The password must be at least 8 characters long.
 
-  Directory Manager password: 
-  Password (confirm): 
+  Directory Manager password:
+  Password (confirm):
 
   The IPA server requires an administrative user, named 'admin'.
   This user is a regular system account used for IPA server administration.
 
-  IPA admin password: 
-  Password (confirm): 
+  IPA admin password:
+  Password (confirm):
 
 
 Do not configure a DNS forwarder (you will want to configure a DNS
@@ -358,7 +373,7 @@ workshop) and accept the defaults for configuring the reverse zone::
   Checking DNS domain ipademo.local., please wait ...
   Do you want to configure DNS forwarders? [yes]: no
   No DNS forwarders configured
-  Do you want to search for missing reverse zones? [yes]: 
+  Do you want to search for missing reverse zones? [yes]:
 
 
 Next, you will be presented with a summary of the server
@@ -448,7 +463,7 @@ workshop can be ignored.  Next you will be be prompted to enter
 credentials of a user authorised to enrol hosts (``admin``)::
 
   User authorized to enroll computers: admin
-  Password for admin@IPADEMO.LOCAL: 
+  Password for admin@IPADEMO.LOCAL:
 
 The enrolment now proceeds; no further input is required.  You will
 see output detailing the operations being completed.  Unlike
@@ -552,10 +567,10 @@ it is set), the next ``kinit`` will prompt them to enter a new
 password::
 
   [server]$ kinit bob
-  Password for bob@IPADEMO.LOCAL: 
+  Password for bob@IPADEMO.LOCAL:
   Password expired.  You must change it now.
-  Enter new password: 
-  Enter it again: 
+  Enter new password:
+  Enter it again:
 
 
 Now ``bob`` has a TGT (run ``klist`` to confirm) which he can use to
@@ -564,7 +579,7 @@ authenticate himself to other hosts and services.  Try logging into
 
   [server]$ ssh bob@client.ipademo.local
   Creating home directory for bob.
-  [bob@client]$ 
+  [bob@client]$
 
 You are now logged into the client as ``bob``.  Type ``^D`` or
 ``exit`` to log out and return to the ``server`` shell.  If you run
@@ -706,17 +721,17 @@ the ``sysadmin`` group.  What about ``alice``?
 ``kinit`` as ``bob`` and try to log in to the client::
 
   [server]$ kinit bob
-  Password for bob@IPADEMO.LOCAL: 
+  Password for bob@IPADEMO.LOCAL:
   [server]$ ssh bob@client.ipademo.local
   packet_write_wait: Connection to UNKNOWN port 0: Broken pipe
 
 Then try ``alice``::
 
   [server]$ kinit alice
-  Password for alice@IPADEMO.LOCAL: 
+  Password for alice@IPADEMO.LOCAL:
   [server]$ ssh alice@client.ipademo.local
   Creating home directory for alice.
-  [alice@client]$ 
+  [alice@client]$
 
 
 Unit 5: Web application authentication and authorisation
@@ -819,7 +834,7 @@ To test that Kerberos Negotiate authentication is working, ``kinit``
 and make a request using ``curl``::
 
   [client]$ kinit bob
-  Password for bob@IPADEMO.LOCAL: 
+  Password for bob@IPADEMO.LOCAL:
 
   [client]$ curl -u : --negotiate http://client.ipademo.local/
   LOGGED IN AS: bob@IPADEMO.LOCAL
@@ -1099,8 +1114,8 @@ identifier given in the ``ipa-getcert request`` output::
           principal name: HTTP/client.ipademo.local@IPADEMO.LOCAL
           key usage: digitalSignature,nonRepudiation,keyEncipherment,dataEncipherment
           eku: id-kp-serverAuth,id-kp-clientAuth
-          pre-save command: 
-          post-save command: 
+          pre-save command:
+          post-save command:
           track: yes
           auto-renew: yes
 
@@ -1196,7 +1211,7 @@ components can be added later via ``ipa-ca-install(1)`` and
 ::
 
   [replica]$ sudo ipa-replica-install
-  Password for admin@IPADEMO.LOCAL: 
+  Password for admin@IPADEMO.LOCAL:
 
   Run connection check to master
   Connection check OK
@@ -1554,10 +1569,10 @@ Generate a user keypair on the client system::
   [alice@client]$
   [alice@client]$ ssh-keygen -C alice@ipademo.local
   Generating public/private rsa key pair.
-  Enter file in which to save the key (/home/alice/.ssh/id_rsa): 
+  Enter file in which to save the key (/home/alice/.ssh/id_rsa):
   Created directory '/home/alice/.ssh'.
-  Enter passphrase (empty for no passphrase): 
-  Enter same passphrase again: 
+  Enter passphrase (empty for no passphrase):
+  Enter same passphrase again:
   Your identification has been saved in /home/alice/.ssh/id_rsa.
   Your public key has been saved in /home/alice/.ssh/id_rsa.pub.
   The key fingerprint is:
@@ -1619,7 +1634,7 @@ now work::
 
   [alice@client]$ ssh -o GSSAPIAuthentication=no server.ipademo.local
   Last login: Tue Feb  2 15:10:13 2016
-  [alice@server]$ 
+  [alice@server]$
 
 To verify the SSH public key was used for authentication, you can
 check the ``sshd`` service journal on the server, which should have
