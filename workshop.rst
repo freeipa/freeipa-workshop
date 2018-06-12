@@ -22,14 +22,22 @@ X.509 certificates for services.
 Curriculum overview
 -------------------
 
-- `Module 1: Installing the FreeIPA server`_
-- `Module 2: Enrolling client machines`_
-- `Module 3: User management and Kerberos authentication`_
-- `Module 4: Host-based access control (HBAC)`_
-- `Module 5: Web application authentication and authorisation`_
-- `Module 6: Certificate management`_
-- `Module 7: Replica installation`_
-- `Module 8: Managing public ssh-keys for users and hosts`-
+Mandatory:
+
+- `Unit 1: Installing the FreeIPA server <1-server-install.rst>`_
+- `Unit 2: Enrolling client machines <2-client-install.rst>`_
+- `Unit 3: User management and Kerberos authentication <3-user-management.rst>`_
+- `Unit 4: Host-based access control (HBAC) <4-hbac.rst>`_
+
+Optional units—choose the topics that are relevant to you:
+
+- `Unit 5: Web application authentication and authorisation <5-web-app-authnz.rst>`_
+- `Unit 6: Service certificates <6-cert-management.rst>`_
+- `Unit 7: Replica installation <7-replica-install.rst>`_
+- `Unit 8: Sudo rule management <8-sudorule.rst>`_
+- `Unit 9: SELinux User Maps <9-selinux-user-map.rst>`_
+- `Unit 10: SSH user and host key management <10-ssh-key-management.rst>`_
+
 
 Editing files on VMs
 --------------------
@@ -61,10 +69,11 @@ Preparation
 ===========
 
 Some preparation is needed prior to the workshop.  The workshop is
-designed to be carried out in a Vagrant_ environment that consists of
-several VMs.  **The goal of the preparation** is to be able to
-successfully ``vagrant up`` the VMs as the first step of the
-workshop.
+designed to be carried out in a Vagrant_ environment that configures
+three networked virtual machines (VMs) with all software needed for
+the workshop.  **The goal of this preparation** is to ``vagrant up``
+the VMs.  After this preparation is completed you are ready to begin
+the workshop.
 
 .. _Vagrant: https://www.vagrantup.com/
 
@@ -74,8 +83,7 @@ Requirements
 
 For the FreeIPA workshop you will need to:
 
-- Install **Vagrant** and **VirtualBox 4.3** (VirtualBox 5 is not
-  supported by Vagrant).  (On Fedora, you can use **libvirt**
+- Install **Vagrant** and **VirtualBox**. (On Fedora, you can use **libvirt**
   instead of VirtualBox).
 
 - Use Git to clone the repository containing the ``Vagrantfile``
@@ -100,15 +108,20 @@ If you intend to use the ``libvirt`` provider (recommended), install
 
   $ sudo dnf install -y vagrant-libvirt vagrant-libvirt-doc
 
-Allow your regular user ID to start and stop Vagrant boxes. A PolicyKit rule
-will be added that allows users in the vagrant group to control VMs through
-libvirt. The necessary rule is included in the ``vagrant-libvirt-doc`` 
-package. Run the following commands to add your local user to the vagrant 
-group and to copy the necessary rule to the right place::
+Also ensure you have the latest versions of ``selinux-policy`` and
+``selinux-policy-targeted``.
 
-  $ usermod -a -G vagrant $USER
-  $ cp /usr/share/vagrant/gems/doc/vagrant-libvirt-*/polkit/10-vagrant-libvirt.rules \
-    /etc/polkit-1/rules.d
+Allow your regular user ID to start and stop Vagrant boxes using ``libvirt``.
+Add your user to ``libvirt`` group so you don't need to enter your administrator
+password everytime::
+
+  $ sudo gpasswd -a ${USER} libvirt
+  $ newgrp libvirt
+
+On **Fedoda 28** you need to enable ``virtlogd``::
+
+  $ systemctl enable virtlogd.socket
+  $ systemctl start virtlogd.socket
 
 Finally restart the services::
 
@@ -137,9 +150,9 @@ in the transcript below (to make sure it wasn't tampered with)::
   repo_gpgcheck=1
   gpgkey=https://www.virtualbox.org/download/oracle_vbox.asc
 
-  $ sudo dnf install -y VirtualBox-4.3
+  $ sudo dnf install -y VirtualBox-5.2
 
-Finally, load the kernel modules::
+Finally, load the kernel modules (you may need to restart your system for this to work)::
 
   $ sudo modprobe vboxdrv vboxnetadp
 
@@ -150,8 +163,8 @@ Mac OS X
 Install Vagrant for Mac OS X from
 https://www.vagrantup.com/downloads.html.
 
-Install VirtualBox 4.3 for **OS X hosts** from
-https://www.virtualbox.org/wiki/Download_Old_Builds_4_3.
+Install VirtualBox 5.2 for **OS X hosts** from
+https://www.virtualbox.org/wiki/Downloads.
 
 Install Git from https://git-scm.com/download/mac or via your
 preferred package manager.
@@ -164,19 +177,19 @@ Install Vagrant and Git::
 
   $ sudo apt-get install -y vagrant git
 
-**Virtualbox 4.3** may be available from the system package manager,
+**Virtualbox 5.2** may be available from the system package manager,
 depending your your release.  Find out which version of VirtualBox is
 available::
 
   $ apt list virtualbox
   Listing... done
-  virtualbox/trusty-updates,trusty-security 4.3.10-dfsg-1ubuntu5 amd64
+  virtualbox/bionic 5.2.10-dfsg-6 amd64
 
-If version 4.3 is available, install it via ``apt-get``::
+If version 5.2 is available, install it via ``apt-get``::
 
   $ sudo apt-get install -y virtualbox
 
-If VirtualBox 4.3 was not available in the official packages for
+If VirtualBox 5.2 was not available in the official packages for
 your release, follow the instructions at
 https://www.virtualbox.org/wiki/Linux_Downloads to install it.
 
@@ -187,8 +200,8 @@ Windows
 Install Vagrant via the ``.msi`` available from
 https://www.vagrantup.com/downloads.html.
 
-Install VirtualBox 4.3 for **Windows hosts** from
-https://www.virtualbox.org/wiki/Download_Old_Builds_4_3.
+Install VirtualBox 5.2 for **Windows hosts** from
+https://www.virtualbox.org/wiki/Downloads.
 
 You will also need to install an SSH client, and Git.  Git for
 Windows also comes with an SSH client so just install Git from
@@ -209,28 +222,20 @@ workshop, which you will need locally.
 Fetch Vagrant box
 -----------------
 
-Please fetch the Vagrant box prior to the workshop.  It is > 500MB
+Please fetch the Vagrant box prior to the workshop.  It is > 600MB
 so it may not be feasible to download it during the workshop.
 
 ::
 
-  $ vagrant box add ftweedal/freeipa-workshop
-
-
-If you are running an older version of Vagrant that does not know
-about the *Atlas* service where the box is hosted, you can add it
-by URL instead::
-
-  $ vagrant box add ftweedal/freeipa-workshop \
-      https://atlas.hashicorp.com/ftweedal/boxes/freeipa-workshop/versions/0.0.6/providers/virtualbox.box
+  $ vagrant box add netoarmando/freeipa-workshop
 
 
 Add hosts file entries
 ----------------------
 
-*This step is necessary if you want to access the FreeIPA Web UI in
-the VM from a browser on your host, but otherwise this step is optional. All
-workshop modules can be completed using the CLI.*
+*This step is optional.  All units can be completed using the CLI
+only.  But if you want to access the FreeIPA Web UI or other web
+servers on the VMs from your browser, follow these instructions.*
 
 Add the following entries to your hosts file::
 
@@ -245,1026 +250,82 @@ On Windows, edit ``C:\Windows\System32\system\drivers\etc\hosts`` as
 *Administrator*.
 
 
-Module 1: Installing the FreeIPA server
-=======================================
+Next step
+---------
 
-In this module you will install the FreeIPA server, which you will
-use for the rest of the workshop.
+You are ready to begin the workshop.  Continue to
+`Unit 1: Installing the FreeIPA server <1-server-install.rst>`_.
 
-First, in the directory containing the ``Vagrantfile`` (the clone of
-this repository), execute ``vagrant up`` to bring up the Vagrant
-environment.  (If you are using the VirtualBox provider on a platform
-where that is not the default, e.g. Fedora, you will also need the
-``--provider virtualbox`` option).
 
-::
-
-  $ vagrant up --provider virtualbox
-
-The Vagrant environment contains three hosts:
-
-- ``server.ipademo.local``
-- ``replica.ipademo.local``
-- ``client.ipademo.local``
-
-From the directory containing the ``Vagrantfile``, SSH into the
-``server`` machine::
-
-  $ vagrant ssh server
-
-
-On ``server``, start the FreeIPA server installation program::
-
-  [server]$ sudo ipa-server-install --no-host-dns --mkhomedir
-
-The ``--no-host-dns`` argument is needed because there is no DNS PTR
-resolution for the Vagrant environment.  For production deployment,
-this important sanity check should not be skipped. The ``--mkhomedir`` 
-flag configure PAM to create missing home directories when users log 
-into the host for the first time. FreeIPA supports automount so 
-consider using that for production deployments.
-
-You will be asked a series of questions. Accept the defaults for most 
-of the questions, except as outlined below.
-
-Configure FreeIPA's DNS server::
-
-  Do you want to configure integrated DNS (BIND)? [no]: yes
-
-
-Accept default values for the server hostname, domain name and realm::
-
-  Enter the fully qualified domain name of the computer
-  on which you're setting up server software. Using the form
-  <hostname>.<domainname>
-  Example: master.example.com.
-
-
-  Server host name [server.ipademo.local]: 
-
-  Warning: skipping DNS resolution of host server.ipademo.local
-  The domain name has been determined based on the host name.
-
-  Please confirm the domain name [ipademo.local]: 
-
-  The kerberos protocol requires a Realm name to be defined.
-  This is typically the domain name converted to uppercase.
-
-  Please provide a realm name [IPADEMO.LOCAL]: 
-
-
-Enter passwords for *Directory Manager* (used to manage the
-directory server) and *admin* (the main account used for FreeIPA
-administration).  Use something simple that you're not going to
-forget during the workshop!
-
-::
-
-  Certain directory server operations require an administrative user.
-  This user is referred to as the Directory Manager and has full access
-  to the Directory for system management tasks and will be added to the
-  instance of directory server created for IPA.
-  The password must be at least 8 characters long.
-
-  Directory Manager password: 
-  Password (confirm): 
-
-  The IPA server requires an administrative user, named 'admin'.
-  This user is a regular system account used for IPA server administration.
-
-  IPA admin password: 
-  Password (confirm): 
-
-
-Do not configure a DNS forwarder (it is likely that you will want to configure
-a DNS forwarder for a real-world deployment but it is not needed today) and
-accept the defaults for configuring the reverse zone::
-
-  Do you want to configure DNS forwarders? [yes]: no
-  Do you want to configure the reverse zone? [yes]: 
-  Please specify the reverse zone name [33.168.192.in-addr.arpa.]: 
-  Using reverse zone(s) 33.168.192.in-addr.arpa.
-
-
-Next, you will be presented with a summary of the server
-configuration and asked for final confirmation.  Give confirmation to begin the
-server installation::
-
-  The IPA Master Server will be configured with:
-  Hostname:       server.ipademo.local
-  IP address(es): 192.168.33.10
-  Domain name:    ipademo.local
-  Realm name:     IPADEMO.LOCAL
-
-  BIND DNS server will be configured to serve IPA domain with:
-  Forwarders:    No forwarders
-  Reverse zone(s):  33.168.192.in-addr.arpa.
-
-  Continue to configure the system with these values? [no]: yes
-
-The installation takes a few minutes; you will see output indicating
-the progress.
-
-When it completes, run ``kinit admin`` and enter your *admin*
-password to obtain a Kerberos ticket granting ticket (TGT) for the
-``admin`` user::
-
-  [server]$ kinit admin
-  Password for admin@IPADEMO.LOCAL:  <enter password>
-
-Run ``klist`` to view your current Kerberos tickets::
-
-  [server]$ klist
-  Ticket cache: KEYRING:persistent:1000:1000
-  Default principal: admin@IPADEMO.LOCAL
-
-  Valid starting     Expires            Service principal
-  10/15/15 01:48:59  10/16/15 01:48:57  krbtgt/IPADEMO.LOCAL@IPADEMO.LOCAL
-
-The FreeIPA server is now set up and you are ready to begin
-enrolling client machines, creating users, managing services, and
-more!
-
-
-Module 2: Enrolling client machines
-===================================
-
-In this module, you will enrol a *host* as a client of your FreeIPA
-domain.  This means that *users* in your FreeIPA realm (or Active
-Directory realms for which there is a trust with FreeIPA) can log
-into the client machine (subject to access policies) and that *services*
-on the client can leverage FreeIPA's authentication and
-authorisation services.
-
-From the directory that contains the ``Vagrantfile``, SSH into the
-``client`` machine::
-
-  $ vagrant ssh client
-
-
-On ``client``, start the FreeIPA client enrolment program::
-
-  [client]$ sudo ipa-client-install --mkhomedir
-
-The FreeIPA server should be detected through DNS autodiscovery.
-(If DNS discovery fails, e.g. due to client machine having incorrect
-``/etc/resolv.conf`` configuration, you would be prompted to
-manually enter the domain and server hostname instead).
-
-The autodetected server settings will be displayed; confirm to
-proceed::
-
-  [client]$ sudo ipa-client-install
-  Discovery was successful!
-  Hostname: client.ipademo.local
-  Realm: IPADEMO.LOCAL
-  DNS Domain: ipademo.local
-  IPA Server: server.ipademo.local
-  BaseDN: dc=ipademo,dc=local
-
-  Continue to configure the system with these values? [no]: yes
-
-
-The client machine's clock will be synchronised to the server's (the
-Kerberos protocol requires this).  You will then be prompted to
-enter credentials of a user authorised to enrol hosts (``admin``)::
-
-  Synchronizing time with KDC...
-  Attempting to sync time using ntpd.  Will timeout after 15 seconds
-  User authorized to enroll computers: admin
-  Password for admin@IPADEMO.LOCAL: 
-
-The enrolment now proceeds; no further input is required.  You will
-see output detailing the operations being completed.  Unlike
-``ipa-server-install``, client enrolment only takes a few seconds.
-
-Users in your FreeIPA domain can now log into FreeIPA-enrolled
-hosts, subject to *Host-based access control* (HBAC) rules.  Users
-logged onto the host can also acquire Kerberos tickets for accessing
-*services* in your domain.
-
-
-Module 3: User management and Kerberos authentication
-=====================================================
-
-This module introduces the ``ipa`` CLI program and the web
-interface.  We will perform some simple administrative tasks: adding
-groups and users and managing group membership.
-
-Web UI
-------
-
-Visit ``https://server.ipademo.local/``.  You'll get a TLS
-*untrusted issuer* warning which you can dismiss (by adding a temporary
-exception).  Log in as ``admin``.
-
-Welcome to the FreeIPA web UI.  Most management activities can be
-performed here, or via the ``ipa`` CLI program.  See if you can work
-out how to add a *User Group* (let's call it ``sysadmin``) and a
-*User* (give her the username ``alice``).  Make ``alice`` a member
-of the ``sysadmin`` group.
-
-
-CLI
----
-
-On ``server``, make sure you have a Kerberos ticket for ``admin``
-(reminder: ``kinit admin``).
-
-Most FreeIPA adminstrative actions can be carried out using the
-``ipa`` CLI program.  Let's see what commands are available::
-
-  [server]% ipa help commands
-  automember-add                    Add an automember rule.
-  automember-add-condition          Add conditions to an automember rule.
-  automember-default-group-remove   Remove default (fallback) group for all unmatched entries.
-  automember-default-group-set      Set default (fallback) group for all unmatched entries.
-  automember-default-group-show     Display information about the default (fallback) automember groups.
-  ...
-
-Whoa!  There's almost 300 of them!  We'll be using only a handful of
-these today.
-
-You'll notice that commands are grouped by *plugin*.  You can get a
-general overview of a plugin by running ``ipa help <plugin>``, and
-specific information on a particular command by running ``ipa help
-<command>``.
-
-Let's add the user *bob* from the CLI.  See if you can work out how
-to do this using the CLI help commands.  (**hint**: the plugin name
-is ``user``).
-
-
-User authentication
--------------------
-
-We have seen how to authenticate as ``admin``.  The process is the
-same for regular users - just ``kinit <username>``!
-
-Try to authenticate as ``bob``::
-
-  [server]$ kinit bob
-  kinit: Generic preauthentication failure while getting initial credentials
-
-If you did *not* encounter this error, congratulations - you must be
-a disciplined reader of documentation!  To set an initial password
-when creating a user via the ``ipa user-add`` command you must
-supply the ``--password`` flag (the command will prompt for the
-password).
-
-Use the ``ipa passwd`` command to (re)set a user's password::
-
-  [server]$ ipa passwd bob
-  New Password:
-  Enter New Password again to verify:
-  ----------------------------------------
-  Changed password for "bob@IPADEMO.LOCAL"
-  ----------------------------------------
-
-Whenever a user has their password reset (including the first time),
-the next ``kinit`` will prompt them to enter a new password::
-
-  [server]$ kinit bob
-  Password for bob@IPADEMO.LOCAL: 
-  Password expired.  You must change it now.
-  Enter new password: 
-  Enter it again: 
-
-
-Now ``bob`` has a TGT (run ``klist`` to confirm) which can use to
-log in to other hosts and services.  Try logging into
-``client.ipademo.local``::
-
-  [server]$ ssh bob@client.ipademo.local
-  [bob@client]$ 
-
-You are now logged into the client as ``bob``.  Type ``^D`` or
-``exit`` to log out and return to the ``server`` shell.  If you run
-``klist`` again, you will see not only the TGT but a *service ticket*
-that was automatically acquired to log in to
-``client.ipademo.local`` without prompting for a password.  Kerberos
-is a true *single sign-on* protocol!
-
-::
-
-  [server]$ klist
-  Ticket cache: KEYRING:persistent:1000:krb_ccache_dYtyLyU
-  Default principal: bob@IPADEMO.LOCAL
-
-  Valid starting     Expires            Service principal
-  15/10/15 07:15:11  16/10/15 07:15:02  host/client.ipademo.local@IPADEMO.LOCAL
-  15/10/15 07:15:03  16/10/15 07:15:02  krbtgt/IPADEMO.LOCAL@IPADEMO.LOCAL
-
-
-
-Module 4: Host-based access control (HBAC)
-==========================================
-
-FreeIPA's *host-based access control* (HBAC) feature allows you to
-define policies that restrict access to hosts or services based on
-the user attempting to log in and that user's groups, the host that
-they are trying to access (or its *host groups*), and (optionally)
-the service being accessed.
-
-In this module, we will define an HBAC policy that restricts
-access to ``client.ipademo.local`` to members of the
-``sysadmin`` user group.
-
-
-Adding a host group
--------------------
-
-Instead of defining the HBAC rule to directly talk about
-``client.ipademo.local``, create a *host group* called
-``webservers`` and make ``client.ipademo.local`` a member.
-
-Explore the Web UI to work out how to do this, or use the CLI (you
-will need to ``kinit admin``; see if you can work out what plugin
-provides the host group functionality).
-
-**Hint:** if you use the CLI will need to run two commands - one to
-create the host group, and one to add ``client.ipademo.local`` as a
-member of the host group.
-
-
-Disabling the ``allow_all`` HBAC rule
--------------------------------------
-
-HBAC rules are managed via the ``hbacrule`` plugin.  You can
-complete the following actions via the Web UI as well, but we will
-cover the CLI commands.
-
-List the existing HBAC rules::
-
-  [server]$ ipa hbacrule-find
-  -------------------
-  1 HBAC rule matched
-  -------------------
-    Rule name: allow_all
-    User category: all
-    Host category: all
-    Service category: all
-    Description: Allow all users to access any host from any
-    host
-    Enabled: TRUE
-  ----------------------------
-  Number of entries returned 1
-  ----------------------------
-
-The FreeIPA server is installed with a single default ``allow_all``
-rule.  This rule must be disabled for other HBAC rules to take
-effect.  Look for a command that can do this, and run it.
-
-
-Creating HBAC rules
--------------------
-
-HBAC rules are built up incrementally.  The rule is created, then
-users or groups, hosts or hostsgroups and HBAC services are added to
-the rule.  The following transcript details the process::
-
-  [server]$ ipa hbacrule-add sysadmin_webservers
-  -------------------------------------
-  Added HBAC rule "sysadmin_webservers"
-  -------------------------------------
-    Rule name: sysadmin_webservers
-    Enabled: TRUE
-
-  [server]$ ipa hbacrule-add-host sysadmin_webservers --hostgroup webservers
-    Rule name: sysadmin_webservers
-    Enabled: TRUE
-    Host Groups: webservers
-  -------------------------
-  Number of members added 1
-  -------------------------
-
-  [server]$ ipa hbacrule-add-user sysadmin_webservers --group sysadmin
-    Rule name: sysadmin_webservers
-    Enabled: TRUE
-    User Groups: sysadmin
-    Host Groups: webservers
-  -------------------------
-  Number of members added 1
-  -------------------------
-
-  [server]$ ipa hbacrule-mod sysadmin_webservers --servicecat=all
-  ----------------------------------------
-  Modified HBAC rule "sysadmin_webservers"
-  ----------------------------------------
-    Rule name: sysadmin_webservers
-    Service category: all
-    Enabled: TRUE
-    User Groups: sysadmin
-    Host Groups: webservers
-
-The ``--servicecat=all`` option applies this rule for all services on
-matching hosts.  It could have been set during the ``hbacrule-add``
-command instead.
-
-
-Testing HBAC rules
+After the workshop
 ------------------
 
-You can test HBAC rule evaluation using the ``ipa hbactest``
-command::
+Here are some contact details and resources that may help you after
+the workshop is over:
 
-  [server]$ ipa hbactest --host client.ipademo.local --service sshd --user bob
-  ---------------------
-  Access granted: False
-  ---------------------
-    Not matched rules: sysadmin_webservers
+- IRC: ``#freeipa`` and ``#sssd`` (Freenode)
 
-Poor ``bob``.  He won't be allowed in because he is not a member of
-the ``sysadmin`` group.  What about ``alice``?
+- ``freeipa-users@lists.fedorahosted.org`` `mailing list
+  <https://lists.fedoraproject.org/archives/list/freeipa-users@lists.fedorahosted.org/>`_
 
-``kinit`` as ``bob`` and try to log in to the client::
+- `How To guides <https://www.freeipa.org/page/HowTos>`_: large
+  index of articles about specialised tasks and integrations
 
-  [server]$ kinit bob
-  Password for bob@IPADEMO.LOCAL: 
-  [server]$ ssh bob@client.ipademo.local
-  Connection closed by UNKNOWN
+- `Troubleshooting guide
+  <https://www.freeipa.org/page/Troubleshooting>`_: how to debug
+  common problems; how to report bugs
 
-Then try ``alice``::
+- `Bug tracker <https://pagure.io/freeipa>`_
 
-  [server]$ kinit alice
-  Password for alice@IPADEMO.LOCAL: 
-  [server]$ ssh alice@client.ipademo.local
-  Last login: Fri Oct 16 01:09:10 2015 from 192.168.33.10
-  -sh-4.3$ 
+- Information about the `FreeIPA public demo
+  <https://www.freeipa.org/page/Demo>`_ instance
 
+- `Deployment Recommendations
+  <https://www.freeipa.org/page/Deployment_Recommendations>`_:
+  things to consider when going into production
 
-Module 5: Web application authentication and authorisation
-==========================================================
+- `Documentation index
+  <https://www.freeipa.org/page/Documentation>`_
 
-You can configure many kinds of applications to rely on FreeIPA's
-centralised authentication, including web applications.  In this
-module you will configure the Apache web server to use Kerberos
-authentication to authenticate users, PAM to enforce HBAC rules, and
-``mod_lookup_identity`` to populate the request environment with
-user attributes.
+- `FreeIPA Planet <http://planet.freeipa.org/>`_: aggregate of
+  several FreeIPA and identity-management related blogs
 
-All activities in this module take place on ``client`` unless
-otherwise specified.
+- `GitHub organisation <https://github.com/freeipa>`_.  In addition
+  to the `main repository <https://github.com/freeipa/freeipa>`_
+  there are various tools, CI-related projects and documentation.
 
-The demo web application is trivial.  It just reads its request
-environment and responds in plain text with a list of variables
-starting with the string ``"REMOTE_"``.  It should be up and running
-already::
-
-  [client]$ curl http://client.ipademo.local
-  NOT LOGGED IN
-
-  REMOTE_* REQUEST VARIABLES:
-
-    REMOTE_ADDR: 192.168.33.20
-    REMOTE_PORT: 34356
-
-
-Create a service
-----------------
-
-Create a *service* representing the web application on
-``client.ipademo.local``.  A service principal name has the service
-type as its first part, separated from the host name by a slash,
-e.g.  ``HTTP/www.example.com``.  The host part must correspond to an
-existing host in the directory.
-
-You must be getting the hang of FreeIPA by now, so I'll leave the
-rest of this step up to you.  (It's OK to ask for help!)
-
-
-Retrieve Kerberos keytab
-------------------------
-
-The service needs access to its Kerberos key in order to
-authenticate users.  Retrieve the key from the FreeIPA server and
-store it in a *keytab* file (you will need a TGT for ``admin``)::
-
-  [client]$ ipa-getkeytab -s server.ipademo.local \
-            -p HTTP/client.ipademo.local -k app.keytab
-  Keytab successfully retrieved and stored in: app.keytab
-
-We also have to move the file, change its ownership and apply the
-proper SELinux labels to the keytab file so that the Apache process
-which runs under the confined ``apache`` user may read it::
-
-  [client]$ sudo mv app.keytab /etc/httpd
-  [client]$ sudo chown apache:apache /etc/httpd/app.keytab
-  [client]$ sudo restorecon /etc/httpd/app.keytab
-
-
-Enable Kerberos authentication
-------------------------------
-
-In this section we will use mod_auth_gssapi_ to enable Kerberos
-Negotiate / SPNEGO authentication for a web application.
-
-.. _mod_auth_gssapi: https://github.com/modauthgssapi/mod_auth_gssapi
-
-The Apache configuration for the demo application lives in the file
-``/etc/httpd/conf.d/app.conf``.  Update the configuration (use
-``sudo vi`` or ``sudo nano``) to enable Kerberos authentication::
-
-  <VirtualHost *:80>
-    ServerName client.ipademo.local
-    WSGIScriptAlias / /usr/share/httpd/app.py
-
-    <Location />
-      AuthType GSSAPI
-      AuthName "Kerberos Login"
-      GssapiCredStore keytab:/etc/httpd/app.keytab
-      Require valid-user
-    </Location>
-
-    <Directory /usr/share/httpd>
-      <Files "app.py">
-        Require all granted
-      </Files>
-    </Directory>
-  </VirtualHost>
-
-
-When the configuration is in place, restart Apache::
-
-  [client]$ sudo systemctl restart httpd
-
-
-To test that Kerberos Negotiate authentication is working, ``kinit``
-and make a request using ``curl``::
-
-  [client]$ kinit bob
-  Password for bob@IPADEMO.LOCAL: 
-
-  [client]$ curl -u : --negotiate http://client.ipademo.local/
-  LOGGED IN AS: bob@IPADEMO.LOCAL
-
-  REMOTE_* REQUEST VARIABLES:
-
-    REMOTE_ADDR: 192.168.33.20
-    REMOTE_USER: bob@IPADEMO.LOCAL
-    REMOTE_PORT: 42499
-
-The ``REMOTE_USER`` variable in the request environment indicates
-that there is a logged-in user and identifies that user.
-
-
-Populating request environment with user attributes
-----------------------------------------------------
-
-Applications need to know more than just the username of a logged-in
-user.  They want to know the user's name, to send mail to their email
-address and perhaps to know their group memberships or other
-attributes.  In this section, we will use mod_lookup_identity_ to
-populate the HTTP request environment with variables providing
-information about the authenticated user.
-
-.. _mod_lookup_identity: http://www.adelton.com/apache/mod_lookup_identity/
-
-
-``mod_lookup_identity`` retrieves user attributes from SSSD (via D-Bus).
-Edit ``/etc/sssd/sssd.conf``; enable the SSSD ``ifp`` *InfoPipe*
-responder, permit the ``apache`` user to query it, and configure the
-attributes that you want to expose.  Add the following configuration to
-``sssd.conf``::
-
-  [domain/ipademo.local]
-  ...
-  ldap_user_extra_attrs = mail, givenname, sn
-
-  [sssd]
-  services = nss, sudo, pam, ssh, ifp
-  ...
-
-  [ifp]
-  allowed_uids = apache, root
-  user_attributes = +mail, +givenname, +sn
-
-
-Restart SSSD::
-
-  [client]$ sudo systemctl restart sssd
-
-If you had not added an email address to your users when you created them, you will need to empty the SSSD cache::
-
-  [client]$ sudo sss_cache -E
-
-
-You can test the SSSD InfoPipe directly via the ``dbus-send``
-utility::
-
-  [client]$ sudo dbus-send --print-reply --system \
-      --dest=org.freedesktop.sssd.infopipe /org/freedesktop/sssd/infopipe \
-      org.freedesktop.sssd.infopipe.GetUserAttr string:alice array:string:mail
-  method return sender=:1.117 -> dest=:1.119 reply_serial=2
-     array [
-        dict entry(
-           string "mail"
-           variant             array [
-                 string "alice@ipademo.local"
-              ]
-        )
-     ]
-
-
-Now update the Apache configuration to populate the request
-environment.  The ``LookupUserXXX`` directives define the mapping of
-user attributes to request environment variables.  Multi-valued
-attributes can be expanded into multiple variables, as in the
-``LookupUserGroupsIter`` directive.  Do not forget the
-``LoadModule`` directive!
-
-::
-
-  LoadModule lookup_identity_module modules/mod_lookup_identity.so
-
-  <VirtualHost *:80>
-    ServerName client.ipademo.local
-    WSGIScriptAlias / /usr/share/httpd/app.py
-
-    <Location />
-      AuthType GSSAPI
-      AuthName "Kerberos Login"
-      GssapiCredStore keytab:/etc/httpd/app.keytab
-      Require valid-user
-
-      LookupUserAttr mail REMOTE_USER_MAIL
-      LookupUserAttr givenname REMOTE_USER_FIRSTNAME
-      LookupUserAttr sn REMOTE_USER_LASTNAME
-      LookupUserGroupsIter REMOTE_USER_GROUP
-    </Location>
-
-    ...
-  </VirtualHost>
-
-Default SELinux policy prevents Apache from communicating with SSSD
-over D-Bus.  Flip ``httpd_dbus_sssd`` to ``1``::
-
-  [client]$ sudo setsebool -P httpd_dbus_sssd 1
-
-Restart Apache::
-
-  [client]$ sudo systemctl restart httpd
-
-Now make another request to the application and observe that user
-information that was injected into the request environment by
-``mod_lookup_identity`` is reflected in the response::
-
-  [client]$ curl -u : --negotiate http://client.ipademo.local/
-  LOGGED IN AS: alice@IPADEMO.LOCAL
-
-  REMOTE_* REQUEST VARIABLES:
-
-    REMOTE_USER_GECOS: Alice Able
-    REMOTE_USER_GROUP_N: 2
-    REMOTE_ADDR: 192.168.33.20
-    REMOTE_USER_FIRSTNAME: Alice
-    REMOTE_USER_LASTNAME: Able
-    REMOTE_USER: alice@IPADEMO.LOCAL
-    REMOTE_USER_GROUP_2: ipausers
-    REMOTE_USER_GROUP_1: sysadmin
-    REMOTE_PORT: 42586
-    REMOTE_USER_EMAIL: alice@ipademo.local
-
-
-HBAC for web services
----------------------
-
-The final task for this module is to configure Apache to use FreeIPA's HBAC
-rules for access control.  We will use mod_authnz_pam_ in
-conjunction with SSSD's PAM responder to achieve this.
-
-.. _mod_authnz_pam: http://www.adelton.com/apache/mod_authnz_pam/
-
-First add an *HBAC service* named ``app`` for the web application.
-You can do this as ``admin`` via the Web UI or CLI.  **Hint:** the
-``hbacsvc`` plugin provides this functionality.
-
-Next, add an HBAC rule allowing members of the ``sysadmin`` user
-group access to ``app`` (on any host)::
-
-  [client]$ ipa hbacrule-add --hostcat=all sysadmin_app
-  ------------------------------
-  Added HBAC rule "sysadmin_app"
-  ------------------------------
-    Rule name: sysadmin_app
-    Host category: all
-    Enabled: TRUE
-
-  [client]$ ipa hbacrule-add-user sysadmin_app --group sysadmin
-    Rule name: sysadmin_app
-    Host category: all
-    Enabled: TRUE
-    User Groups: sysadmin
-  -------------------------
-  Number of members added 1
-  -------------------------
-
-  [client]$ ipa hbacrule-add-service sysadmin_app --hbacsvcs app
-    Rule name: sysadmin_app
-    Host category: all
-    Enabled: TRUE
-    User Groups: sysadmin
-    Services: app
-  -------------------------
-  Number of members added 1
-  -------------------------
-
-Next, define the PAM service on ``client``.  The name must match the
-``hbacsvc`` name (in our case: ``app``), and the name is indicated
-by the *name of the file* that configures the PAM stack.  Create
-``/etc/pam.d/app`` with the following contents::
-
-  account required   pam_sss.so
-
-Finally, update the Apache configuration.  Find the line::
-
-  Require valid-user
-
-Replace with::
-
-  Require pam-account app
-
-Also add the ``LoadModule`` directive to the top of the file::
-
-  LoadModule authnz_pam_module modules/mod_authnz_pam.so
-
-Once again, we must set a special SELinux boolean to allow
-``mod_authnz_pam`` to work::
-
-  [client]$ sudo setsebool -P allow_httpd_mod_auth_pam 1
-
-Restart Apache and try and perform the same ``curl`` request again
-as ``alice``.  Everything should work as before because ``alice`` is
-a member of the ``sysadmin`` group.  What happens when you are
-authenticated as ``bob`` instead?
-
-
-Module 6: Certificate management
-================================
-
-You probably noticed that the web service was not hosted over HTTPS,
-so there is no TLS-based authentication or confidentiality.  In this
-module, we will issue an X.509 certificate for the web service via
-the *certmonger* program.
-
-Certmonger supports multiple CAs including FreeIPA's CA, and can
-generate keys, issue certifiate requests, track certificates, and
-renew tracked certificates when the expiration time approaches.
-Certmonger works with NSS, so we will also use ``mod_nss`` with
-Apache, rather than ``mod_ssl``.
-
-Let's start by confirming that the HTTP service does not yet have a
-certificate::
-
-  [client]$ ipa service-show HTTP/client.ipademo.local
-    Principal: HTTP/client.ipademo.local@IPADEMO.LOCAL
-    Keytab: True
-    Managed by: client.ipademo.local
-
-Enable and start certmonger::
-
-  [client]$ sudo systemctl enable certmonger
-  Created symlink from /etc/systemd/system/multi-user.target.wants/certmonger.service to /usr/lib/systemd/system/certmonger.service.
-  [client]$ sudo systemctl start certmonger
-
-Now let's request a certificate.  ``mod_nss`` is already configured
-to use the certificate database at ``/etc/httpd/alias``, so we tell
-certmonger to generate the key and add the certificate in that
-database::
-
-  [client]$ sudo ipa-getcert request -d /etc/httpd/alias \
-            -n app -K HTTP/client.ipademo.local
-  New signing request "20151026222558" added.
-
-Let's break down some of those command arguments.
-
-``-d <path>``
-  Path to NSS database
-``-n <nickname>``
-  *Nickname* to use for storing the key and certificate
-``-K <principal>``
-  Kerberos service principal; because different kinds of services may
-  be accessed at one hostname, this argument is needed to tell
-  certmonger which service principal is the subject
-
-Another important argument is ``-N <subject-name>`` but this
-defaults to the system hostname, which in our case
-(``client.ipademo.local``) is appropriate.
-
-Let's check the status of our certificate request using the tracking
-identifier given in the ``ipa-getcert request`` output::
-
-  [client]$ sudo getcert list -i 20151026222558
-  Number of certificates and requests being tracked: 1.
-  Request ID '20151026222558':
-          status: MONITORING
-          stuck: no
-          key pair storage: type=NSSDB,location='/etc/httpd/alias',nickname='app',token='NSS Certificate DB'
-          certificate: type=NSSDB,location='/etc/httpd/alias',nickname='app',token='NSS Certificate DB'
-          CA: IPA
-          issuer: CN=Certificate Authority,O=IPADEMO.LOCAL
-          subject: CN=client.ipademo.local,O=IPADEMO.LOCAL
-          expires: 2017-10-26 22:26:00 UTC
-          principal name: HTTP/client.ipademo.local@IPADEMO.LOCAL
-          key usage: digitalSignature,nonRepudiation,keyEncipherment,dataEncipherment
-          eku: id-kp-serverAuth,id-kp-clientAuth
-          pre-save command: 
-          post-save command: 
-          track: yes
-          auto-renew: yes
-
-Confirm that the certificate was issued and that certmonger is now
-``MONITORING`` the certificate and will ``auto-renew`` it when it is
-close to expiration.  Now if you run ``ipa service-show``, you will
-see a number of attributes related to the certificate, including the
-certificate itself.  Can you work out how to save the PEM-encoded
-certificate to a file?
-
-You can also see that the certificate is present in the NSS
-database, identified by the specified nickname::
-
-  [client]# sudo certutil -d /etc/httpd/alias -L -n app
-  Certificate:
-      Data:
-          Version: 3 (0x2)
-          Serial Number: 11 (0xb)
-          Signature Algorithm: PKCS #1 SHA-256 With RSA Encryption
-          Issuer: "CN=Certificate Authority,O=IPADEMO.LOCAL"
-          Validity:
-              Not Before: Mon Oct 26 22:26:00 2015
-              Not After : Thu Oct 26 22:26:00 2017
-          Subject: "CN=client.ipademo.local,O=IPADEMO.LOCAL"
-    ...
-
-
-Now we can reconfigure Apache to serve our app over TLS.  Update
-``app.conf`` to listen on port 443 and add the NSS directives::
-
-  ...
-
-  Listen 443
-
-  <VirtualHost *:443>
-      NSSEngine on
-      NSSCertificateDatabase /etc/httpd/alias
-      NSSNickname app
-      NSSCipherSuite +aes_128_sha_256,+aes_256_sha_256,+ecdhe_ecdsa_aes_128_gcm_sha_256,+ecdhe_ecdsa_aes_128_sha,+ecdhe_ecdsa_aes_256_gcm_sha_384,+ecdhe_ecdsa_aes_256_sha,+ecdhe_rsa_aes_128_gcm_sha_256,+ecdhe_rsa_aes_128_sha,+ecdhe_rsa_aes_256_gcm_sha_384,+ecdhe_rsa_aes_256_sha,+rsa_aes_128_gcm_sha_256,+rsa_aes_128_sha,+rsa_aes_256_gcm_sha_384,+rsa_aes_256_sha
-
-      ServerName client.ipademo.local
-      ...
-
-
-Restart Apache and make a request to the app over HTTPS::
-
-  [client]$ sudo systemctl restart httpd
-  [client]$ curl -u : --negotiate https://client.ipademo.local
-  LOGGED IN AS: alice@IPADEMO.LOCAL
-
-  REMOTE_* REQUEST VARIABLES:
-
-    REMOTE_USER_MAIL: alice@ipademo.local
-    REMOTE_USER_GECOS: Alice Able
-    REMOTE_USER: alice@IPADEMO.LOCAL
-    REMOTE_USER_GROUP_N: 1
-    REMOTE_ADDR: 192.168.33.20
-    REMOTE_USER_FIRSTNAME: Alice
-    REMOTE_USER_LASTNAME: Able
-    REMOTE_USER_GROUP_1: ipausers
-    REMOTE_PORT: 47894
-
-
-Module 7: Replica installation
-==============================
-
-FreeIPA is designed to be run in a replicated multi-master
-environment.  In this module, we will deploy a single FreeIPA
-replica.  For production deployments, see
-http://www.freeipa.org/page/Deployment_Recommendations#Replicas.
-
-If you have disabled the ``allow_all`` HBAC rule, add a new rule
-that will **allow ``admin`` to access the ``sshd`` service on any
-host**.
-
-To prepare to add a replica, execute the ``ipa-replica-prepare(1)``
-command.  Because FreeIPA manages DNS for our domain, we need to use
-the ``--ip-address`` option.
-
-::
-
-  [server]$ sudo ipa-replica-prepare \
-            --ip-address 192.168.33.11 replica.ipademo.local
-  Directory Manager (existing master) password: 
-
-  Preparing replica for replica.ipademo.local from server.ipademo.local
-  Creating SSL certificate for the Directory Server
-  Creating SSL certificate for the dogtag Directory Server
-  Saving dogtag Directory Server port
-  Creating SSL certificate for the Web Server
-  Exporting RA certificate
-  Copying additional files
-  Finalizing configuration
-  Packaging replica information into /var/lib/ipa/replica-info-replica.ipademo.local.gpg
-  Adding DNS records for replica.ipademo.local
-  The ipa-replica-prepare command was successful
-
-The *replica file* is now available at
-``/var/lib/ipa/replica-info-replica.ipademo.local.gpg`` and must be
-copied to the ``replica`` VM::
-
-  % vagrant ssh server -- \
-    "sudo cat /var/lib/ipa/replica-info-replica.ipademo.local.gpg" \
-    | vagrant ssh replica -- "cat > replica.gpg"
-
-We will set up a replica *without* CA or DNS, but in a production
-deployment there should be at least one instance of these services
-in each datacentre.  See the ``ipa-replica-install(1)`` man page for
-details.
-
-SSH to the ``replica`` VM and install the replica::
-
-  % vagrant ssh replica
-  [replica]$ sudo ipa-replica-install --mkhomedir replica.gpg 
-  Directory Manager (existing master) password: 
-
-  Run connection check to master
-  Check connection from replica to remote master 'server.ipademo.local':
-     Directory Service: Unsecure port (389): OK
-     Directory Service: Secure port (636): OK
-     Kerberos KDC: TCP (88): OK
-     Kerberos Kpasswd: TCP (464): OK
-     HTTP Server: Unsecure port (80): OK
-     HTTP Server: Secure port (443): OK
-
-  The following list of ports use UDP protocol and would need to be
-  checked manually:
-     Kerberos KDC: UDP (88): SKIPPED
-     Kerberos Kpasswd: UDP (464): SKIPPED
-
-  Connection from replica to master is OK.
-  Start listening on required ports for remote master check
-  Get credentials to log in to remote master
-  admin@IPADEMO.LOCAL password: 
-
-  Check SSH connection to remote master
-  Execute check on remote master
-  Check connection from master to remote replica 'replica.ipademo.local':
-     Directory Service: Unsecure port (389): OK
-     Directory Service: Secure port (636): OK
-     Kerberos KDC: TCP (88): OK
-     Kerberos KDC: UDP (88): OK
-     Kerberos Kpasswd: TCP (464): OK
-     Kerberos Kpasswd: UDP (464): OK
-     HTTP Server: Unsecure port (80): OK
-     HTTP Server: Secure port (443): OK
-
-  Connection from master to replica is OK.
-
-  Connection check OK
-  Configuring NTP daemon (ntpd)
-    [1/4]: stopping ntpd
-    [2/4]: writing configuration
-  ...
-
-The rest of the replica installation process is almost identical to
-server installation.  One important difference is the initial
-replication of data to the new Directory Server instance::
-
-  [24/38]: setting up initial replication
-  Starting replication, please wait until this has completed.
-  Update in progress, 6 seconds elapsed
-  Update succeeded
-
+<<<<<<< HEAD
 After ``ipa-replica-install`` finishes, the replica is operational.
 
 
-Module 8: Managing public ssh-keys for users and hosts 
+Module 8: Managing public ssh-keys for users and hosts
 ======================================================
 
-In this module you explore, how to use FreeIPA as a backend provider 
-for ssh-keys. Instead of using distributed ``authorized_keys`` and 
-``known_hosts`` files, ssh-keys are uploaded to their corresponding 
+In this module you explore, how to use FreeIPA as a backend provider
+for ssh-keys. Instead of using distributed ``authorized_keys`` and
+``known_hosts`` files, ssh-keys are uploaded to their corresponding
 user and host entries in FreeIPA.
 
 Using FreeIPA as a backend store for ssh user-keys
 --------------------------------------------------
 
-OpenSSH uses ``public-private key pairs`` to authenticate users. 
-A user attempts to access some network resource and presents its key 
-pair. The machine then stores the user's public key in an 
-``authorized_keys`` file. Any time that the user attempts to access 
-the resource again, the machine simply checks its ``authorized_keys`` 
-file and then grants access automatically to approved users. If the 
-target system does not share a common home directory, the user must 
-copy the public part of his SSH key to the target system he intends 
-to log in to. The public portion of the SSH key must be copied to 
+OpenSSH uses ``public-private key pairs`` to authenticate users.
+A user attempts to access some network resource and presents its key
+pair. The machine then stores the user's public key in an
+``authorized_keys`` file. Any time that the user attempts to access
+the resource again, the machine simply checks its ``authorized_keys``
+file and then grants access automatically to approved users. If the
+target system does not share a common home directory, the user must
+copy the public part of his SSH key to the target system he intends
+to log in to. The public portion of the SSH key must be copied to
 each target system the user intends to log in to.
 
 In FreeIPA, the System Security Services Daemon (SSSD) can be
 configured to cache and retrieve user SSH keys so that applications
 and services only have to look in one location for user keys.
-Because SSSD can use FreeIPA  as one of its identity information 
-providers, FreeIPA provides a universal and centralized repository 
-of keys. Administrators do not need to worry about distributing, 
+Because SSSD can use FreeIPA  as one of its identity information
+providers, FreeIPA provides a universal and centralized repository
+of keys. Administrators do not need to worry about distributing,
 updating, or verifying user SSH keys.
 
 Generate a user key on the client system::
@@ -1273,10 +334,10 @@ Generate a user key on the client system::
   [alice@client]$
   [alice@client]$ ssh-keygen -C alice@ipademo.local
   Generating public/private rsa key pair.
-  Enter file in which to save the key (/home/alice/.ssh/id_rsa): 
+  Enter file in which to save the key (/home/alice/.ssh/id_rsa):
   Created directory '/home/alice/.ssh'.
-  Enter passphrase (empty for no passphrase): 
-  Enter same passphrase again: 
+  Enter passphrase (empty for no passphrase):
+  Enter same passphrase again:
   Your identification has been saved in /home/alice/.ssh/id_rsa.
   Your public key has been saved in /home/alice/.ssh/id_rsa.pub.
   The key fingerprint is:
@@ -1287,30 +348,30 @@ user entry in the FreeIPA system::
 
   [alice@client]$ kinit alice
   Password for alice@IPADEMO.LOCAL:
-  
+
   [alice@client]$ cat /home/alice/.ssh/id_rsa.pub
   ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAA[...]alice@ipademo.local
-  
+
   [alice@client]$ ipa user-mod alice --sshpubkey="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAA[...]alice@ipademo.local"
 
 During the configuration of the systems, the Security
-Services Daemon (SSSD) has already been configured to use 
-FreeIPA as one of its identity domains and OpenSSH has been 
-setup to use SSSD for managing user keys. 
+Services Daemon (SSSD) has already been configured to use
+FreeIPA as one of its identity domains and OpenSSH has been
+setup to use SSSD for managing user keys.
 
 If you have disabled the ``allow_all`` HBAC rule, add a new rule
 that will **allow ``alice`` to access the ``sshd`` service on any
 host**.
 
-Logging in to the server using the previously created ``ssh pubkey`` 
+Logging in to the server using the previously created ``ssh pubkey``
 should now work out of the box::
 
   [alice@client]$ ssh -o GSSAPIAuthentication=no server.ipademo.local
   Last login: Tue Feb  2 15:10:13 2016
-  [alice@server]$ 
+  [alice@server]$
 
-To verify the ssh pubkey has been used for authentication, you can 
-check the sshd service journal on the server, which should have a 
+To verify the ssh pubkey has been used for authentication, you can
+check the sshd service journal on the server, which should have a
 similar entry like this one::
 
   server.ipademo.local sshd[19729]: Accepted publickey for alice from 192.168.33.20 port 37244 \
@@ -1325,7 +386,7 @@ access another machine and presents its key pair. The first time the host
 authenticates, the administrator on the target machine has to approve the
 request manually. The machine then stores the host's public key in a
 ``known_hosts`` file. Any time that the remote machine attempts to access the
-target machine again, the target machine simply checks its ``known_hosts`` 
+target machine again, the target machine simply checks its ``known_hosts``
 file and then grants access automatically to approved hosts.
 
 Based on the last exercise, try to figure out how you can upload ssh

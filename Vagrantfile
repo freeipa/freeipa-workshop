@@ -3,7 +3,7 @@
 
 Vagrant.configure(2) do |config|
 
-  config.vm.box = "ftweedal/freeipa-workshop"
+  config.vm.box = "netoarmando/freeipa-workshop"
 
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
@@ -34,6 +34,10 @@ Vagrant.configure(2) do |config|
     replica.vm.hostname = "replica.ipademo.local"
 
     replica.vm.provision "shell",
+      inline: 'echo "PEERDNS=no" >> /etc/sysconfig/network-scripts/ifcfg-eth0'
+    replica.vm.provision "shell",
+      inline: 'echo "DNS1=192.168.33.10" >> /etc/sysconfig/network-scripts/ifcfg-eth1'
+    replica.vm.provision "shell",
       inline: 'echo "nameserver 192.168.33.10" > /etc/resolv.conf'
   end
 
@@ -42,11 +46,17 @@ Vagrant.configure(2) do |config|
     client.vm.hostname = "client.ipademo.local"
 
     client.vm.provision "shell",
+      inline: 'echo "PEERDNS=no" >> /etc/sysconfig/network-scripts/ifcfg-eth0'
+    client.vm.provision "shell",
+      inline: 'echo "DNS1=192.168.33.10" >> /etc/sysconfig/network-scripts/ifcfg-eth1'
+    client.vm.provision "shell",
       inline: 'echo "nameserver 192.168.33.10" > /etc/resolv.conf'
     client.vm.provision "shell",
-      inline: 'sudo sed -i -n "/^<VirtualHost/q;p" /etc/httpd/conf.d/nss.conf'
+      inline: 'sudo sed -i "s/^/#/g" /etc/httpd/conf.d/ssl.conf'
     client.vm.provision "shell",
       inline: 'systemctl -q enable httpd && systemctl start httpd'
+    client.vm.provision "shell",
+      inline: 'systemctl -q enable oddjobd && systemctl start oddjobd'
   end
 
 end
