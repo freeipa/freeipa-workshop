@@ -120,8 +120,7 @@ password everytime::
 
 On **Fedoda 28** you need to enable ``virtlogd``::
 
-  $ systemctl enable virtlogd.socket
-  $ systemctl start virtlogd.socket
+  $ systemctl enable --now virtlogd.socket
 
 Finally restart the services::
 
@@ -294,4 +293,4 @@ the workshop is over:
   to the `main repository <https://github.com/freeipa/freeipa>`_
   there are various tools, CI-related projects and documentation.
 
-- `Development roadmap <https://www.freeipa.org/page/Roadmap>`_
+- `Development roadmap <https://www.freeipa.org/page/Roadmap>`
