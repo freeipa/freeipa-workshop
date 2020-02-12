@@ -9,6 +9,7 @@ Vagrant.configure(2) do |config|
 
   config.vm.provider :libvirt do |libvirt|
     libvirt.memory = 1024
+    libvirt.qemu_use_session = false
   end
 
   # Vagrant's "change host name" sets the short host name.  Before
